@@ -34,6 +34,13 @@ start_messenger(Prid, Receiver) ->
 			io:format("Gesuchter Kontakt: ~p:~p~n", [ReqContact, Receiver]),
 			deployrequest( ReqContact ,node(), Prid, Receiver),
 			start_messenger(Prid, Receiver);
+		"/H\n" ->
+			io:fwrite("/H for Help ~n"),
+			io:fwrite("/P See who is online~n"),
+			io:fwrite("/S Search for a Contact by Username ~n"),
+			io:fwrite("/C ~n"),
+			io:fwrite("/B for Broadcasting to all Online Users ~n"),
+			start_messenger(Prid, Receiver);
 		_ ->
 			{chat, Prid} ! {chat, node(), Term},
 			start_messenger(Prid, Receiver)
@@ -119,7 +126,9 @@ get_each_contactPing(Device, User2, Receiver) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 readlinesContact(Word, SearchingPID, Prid, Messenger) ->
+	io:fwrite("ICH BIN IM CONTACT search drin, mit dem Wort: ~p:~p~n", [Word, SearchingPID]),
     {ok, Device} = file:open("Contact.txt", [read]),
+    io:fwrite("DEVICE: ~p", [Device]),
     try search_all_contacts(Device, Word, SearchingPID, Prid, Messenger)
       after file:close(Device)
     end.
@@ -128,10 +137,13 @@ readlinesContact(Word, SearchingPID, Prid, Messenger) ->
 search_all_contacts(Device, Word, SearchingPID, Prid, Messenger) ->
    case  file:read_line(Device) of
         {ok, Line} -> 
+        io:fwrite("Ich habs in der SUCHE geschafft: ~s~n", [SearchingPID]),
         WTF = string:lexemes(Line, "@" ++ [$\n]),
+        io:fwrite("Meine Kontakte: ~p~n", [WTF]),
         Mem = lists:member(Word, WTF),
         	if
         		Mem =:= true ->
+					io:fwrite("BIN IM IF DRIN~n"),
                     ReqContact = string:lexemes(Line, [$\n]),
                     PID = list_to_atom(lists:concat(ReqContact)),
                     {chat, SearchingPID} ! {ackreq, PID};
@@ -157,6 +169,7 @@ send_to_each_contact(Device, SearchingPID, Word, Prid, Messenger) ->
         {ok, Line} -> 
             NewList = string:lexemes(Line, [$\n]),
             PID = list_to_atom(lists:concat(NewList)),
+            io:format("Senden an Kontakt: ~p~n", [PID]),
             {chat, PID} ! {reqPID, SearchingPID, Word},
             send_to_each_contact(Device, SearchingPID, Word, Prid,Messenger);
 
