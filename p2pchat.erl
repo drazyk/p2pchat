@@ -5,10 +5,10 @@
 		readlines/2, 
 		get_each_contact/3, 
 		ping/2,
-		readlinesContact/2, 
-        search_all_contacts/3,
-        deployrequest/2,
-        send_to_each_contact/3]).
+		readlinesContact/4, 
+        search_all_contacts/5,
+        deployrequest/4,
+        send_to_each_contact/5]).
 
 
 start_chat(Prid) ->
@@ -29,8 +29,10 @@ start_messenger(Prid, Receiver) ->
 			start_messenger(Prid, Receiver);
 		"/S\n" ->
 			Request = io:get_line("Searching User:"),
-			ReqContact = string:lexemes(Request, [$\n]),
-			deployrequest( ReqContact ,Receiver),
+			List = string:lexemes(Request, [$\n]),
+			ReqContact = lists:nth(1, List),
+			io:format("Gesuchter Kontakt: ~p:~p~n", [ReqContact, Receiver]),
+			deployrequest( ReqContact ,node(), Prid, Receiver),
 			start_messenger(Prid, Receiver);
 		_ ->
 			{chat, Prid} ! {chat, node(), Term},
@@ -60,10 +62,12 @@ start_receiver(Prid, Messenger) ->
 			start_receiver(Prid, Messenger),
 			start_messenger(Prid, Messenger);
 		{reqPID, SearchingPID, Word} ->
-			readlinesContact(Word, SearchingPID),
-			start_receiver(Prid, Messenger);
+			io:format("Anfrage erhalten: ~p--~p~n ", [Word, SearchingPID]),
+			readlinesContact(Word, SearchingPID, Prid, Messenger),
+			start_receiver(Prid, Messenger),
+			start_messenger(Prid, Messenger);
 		{ackreq, PID} ->
-			io:fwrite("Antwort erhalten"),
+			io:format("Antwort erhalten: ~p~n", [PID]),
 			file:write_file("Contact.txt", io_lib:fwrite("~s~n", [PID]), [append]),
 			start_receiver(Prid, Messenger),
 			start_messenger(Prid, Messenger);
@@ -111,25 +115,21 @@ get_each_contactPing(Device, User2, Receiver) ->
 
         eof        -> start_messenger(User2, Receiver)
     end.
-
-% Gnutella for Searchcontact
-%Am schluss ändern auf OnlineContact.txt
+	
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-readlinesContact(Word, SearchingPID) ->
+readlinesContact(Word, SearchingPID, Prid, Messenger) ->
     {ok, Device} = file:open("Contact.txt", [read]),
-    try search_all_contacts(Device, Word, SearchingPID)
+    try search_all_contacts(Device, Word, SearchingPID, Prid, Messenger)
       after file:close(Device)
     end.
     
 
-search_all_contacts(Device, Word, SearchingPID) ->
+search_all_contacts(Device, Word, SearchingPID, Prid, Messenger) ->
    case  file:read_line(Device) of
         {ok, Line} -> 
-        %removes Newline caracter from Line, and separates them in a list
-        NewList = string:lexemes(Line, "@" ++ [$\n]),
-        %io:fwrite("Meine Kontakte: ~p", [Line]),
-        Mem = lists:member(Word, NewList),
+        WTF = string:lexemes(Line, "@" ++ [$\n]),
+        Mem = lists:member(Word, WTF),
         	if
         		Mem =:= true ->
                     ReqContact = string:lexemes(Line, [$\n]),
@@ -138,28 +138,30 @@ search_all_contacts(Device, Word, SearchingPID) ->
         		true -> 
         			false
         	end,
-        	search_all_contacts(Device, Word, SearchingPID);
+        	search_all_contacts(Device, Word, SearchingPID, Prid, Messenger);
 
-        eof        -> deployrequest(Word, SearchingPID)
+        eof        -> start_receiver(Prid, Messenger), 
+        			start_messenger(Prid, Messenger)
     end.
 
 
 
-deployrequest(Word, SearchingPID) ->
+deployrequest(Word, SearchingPID, Prid, Messenger) ->
     {ok, Device} = file:open("Contact.txt", [read]),
-    try send_to_each_contact(Device, SearchingPID, Word)
+    try send_to_each_contact(Device, SearchingPID, Word, Prid, Messenger)
       after file:close(Device)
     end.
 
-send_to_each_contact(Device, SearchingPID, Word) ->
+send_to_each_contact(Device, SearchingPID, Word, Prid, Messenger) ->
    case  file:read_line(Device) of
         {ok, Line} -> 
             NewList = string:lexemes(Line, [$\n]),
             PID = list_to_atom(lists:concat(NewList)),
             {chat, PID} ! {reqPID, SearchingPID, Word},
-            send_to_each_contact(Device, SearchingPID, Word);
+            send_to_each_contact(Device, SearchingPID, Word, Prid,Messenger);
 
-        eof        -> ok.
+        eof        -> start_messenger(Prid, Messenger),
+        				start_receiver(Prid, Messenger)
     end.
 
 
