@@ -2,8 +2,11 @@
 -export([start_chat/1,
 		start_messenger/2,
 		start_receiver/2, 
-		readlines/2, 
-		get_each_contact/3, 
+		printlines/0, 
+		printlines_helper/2,
+		get_each_contact/3,
+		connectTo/1,
+		connectTo_helper/3, 
 		ping/2,
 		readlinesContact/4, 
         search_all_contacts/5,
@@ -17,13 +20,19 @@ start_chat(Prid) ->
 	start_messenger(Prid, Pid).
 
 start_messenger(Prid, Receiver) ->
+	io:format("Connection Startet to: ~p~n", [Prid]),
 	Term = io:get_line("You:"),
 	Test = delete_whitespaces(Term),
 	case Test of
 		"/exit\n" -> Receiver ! {kill};
 		"/C\n" -> 
-			readlines(Prid, Receiver),
+			printlines(),
 			start_messenger(Prid, Receiver);
+		"/V\n"->
+			Request = io:get_line("Connect to User Nr.: "),
+    		WoNl = string:lexemes(Request, [$\n]),
+    		Receiver ! {kill},
+    		connectTo(WoNl);
 		"/P\n" ->
 			ping(Prid, Receiver),
 			start_messenger(Prid, Receiver);
@@ -82,7 +91,61 @@ start_receiver(Prid, Messenger) ->
 			io:format("\ Receiver ended ~n")
 
 	end.
+printlines() ->
+    Counter = 1,
+    {ok, Device} = file:open("Contact.txt", [read]),
+    try printlines_helper(Device, Counter)
+      after file:close(Device)
+    end.
+    
 
+printlines_helper(Device, Counter) ->
+   case  file:read_line(Device) of 
+        {ok, Line} -> 
+        Contact = string:lexemes(Line, [$\n]),
+        %Falls die letzte Linie ein \n ist
+        if
+        	Contact =:= [] ->
+        		io:fwrite("\n");
+        	true ->
+        		Disp = lists:nth(1, Contact),
+        		io:fwrite("~p.)~p~n", [Counter, Disp]),
+        		printlines_helper(Device, Counter+1)
+        end;
+        
+        eof        -> ok
+    end.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Für die Verbindung zu einem neuen Kontakt
+connectTo(Int) ->
+    Counter = 1,
+    {ok, Device} = file:open("Contact.txt", [read]),
+    try connectTo_helper(Device, Int, Counter)
+      after file:close(Device)
+    end.
+    
+
+connectTo_helper(Device, Int, Counter) ->
+	Convert = string:to_integer(Int),
+    Integer = element(1, Convert),
+   case  file:read_line(Device) of
+        {ok, Line} -> 
+        Contact = string:lexemes(Line, [$\n]),
+        if
+            Counter =:= Integer ->
+
+                PID = list_to_atom(lists:concat(Contact)),
+                start_chat(PID);
+            true ->
+                false
+        end,
+        connectTo_helper(Device, Int, Counter+1);
+        eof        -> ok
+    end.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Hab den zweck dieser Funktion vergessen, vielleicht fällt es mir noch ein
 readlines(MasterPID, Receiver) ->
     {ok, Device} = file:open("Contact.txt", [read]),
     try get_each_contact(Device, MasterPID, Receiver)
@@ -102,7 +165,7 @@ get_each_contact(Device, MasterPID, Receiver) ->
 
         eof        -> start_messenger(MasterPID, Receiver)
     end.
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 ping(Prid, Receiver) ->
 	readlinesPing(Prid, Receiver).
 
