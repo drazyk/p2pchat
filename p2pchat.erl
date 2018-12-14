@@ -39,7 +39,8 @@ start_messenger(Prid, Receiver) ->
 			io:fwrite("/P See who is online~n"),
 			io:fwrite("/S Search for a Contact by Username ~n"),
 			io:fwrite("/C"),
-			io:fwrite("/B for Broadcasting to all Online Users");
+			io:fwrite("/B for Broadcasting to all Online Users"),
+			start_messenger(Prid, Receiver);
 		_ ->
 			{chat, Prid} ! {chat, node(), Term},
 			start_messenger(Prid, Receiver)
