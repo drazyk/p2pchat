@@ -38,9 +38,8 @@ start_messenger(Prid, Receiver) ->
 			io:fwrite("/H for Help ~n"),
 			io:fwrite("/P See who is online~n"),
 			io:fwrite("/S Search for a Contact by Username ~n"),
-			io:fwrite("/C ~n"),
-			io:fwrite("/B for Broadcasting to all Online Users ~n"),
-			start_messenger(Prid, Receiver);
+			io:fwrite("/C"),
+			io:fwrite("/B for Broadcasting to all Online Users");
 		_ ->
 			{chat, Prid} ! {chat, node(), Term},
 			start_messenger(Prid, Receiver)
@@ -150,6 +149,7 @@ search_all_contacts(Device, Word, SearchingPID, Prid, Messenger) ->
         		true -> 
         			false
         	end,
+        	deployrequest(Word, SearchingPID, Prid, Messenger),
         	search_all_contacts(Device, Word, SearchingPID, Prid, Messenger);
 
         eof        -> start_receiver(Prid, Messenger), 
