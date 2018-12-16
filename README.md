@@ -19,11 +19,9 @@ Wie führt man die Implementierung des Chat's (1) aus:
     nach dem Kopieren, speichern nicht vergessen!
 
 	Beispiel:
-
       Ordner 1: 
      	nach Ausführung von ./ip.sh: user1@111.111.22.22
       Ordner 2:
-        
        	nach Ausführung von ./ip.sh: user2@111.111.22.22
      
     user1@111.111.22.22 ins Contact.txt in Ordner 2 kopieren
