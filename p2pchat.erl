@@ -4,6 +4,8 @@
 		start_receiver/2, 
 		printlines/0, 
 		printlines_helper/2,
+		printlines2/0,
+		printlines_helper2/2,
 		get_each_contact/3,
 		connectTo/1,
 		connectTo_helper/3,
@@ -17,12 +19,13 @@
         deployrequest/4,
         send_to_each_contact/5, 
         delCont/1,
-        delCont_helper/2]).
+        delCont_helper/2, 
+        rename/0,
+        removefile/0]).
 
 
 start_chat(Prid) ->
 	Pid = spawn(p2pchat, start_receiver, [Prid,self()]),
-	io:fwrite("Prid: ~p und Pid: ~p und Self: ~p~n", [Prid, Pid, self()]),
 	Pid ! {register},
 	start_messenger(Prid, Pid).
 
@@ -31,7 +34,10 @@ start_messenger(Prid, Receiver) ->
 	Term = io:get_line("You:"),
 	Test = delete_whitespaces(Term),
 	case Test of
-		"/exit\n" -> Receiver ! {kill};
+		"/exit\n" -> 
+		offtoall(Prid),
+		unregister(chat),
+		Receiver ! {kill};
 		"/C\n" -> 
 			printlines(),
 			start_messenger(Prid, Receiver);
@@ -41,21 +47,25 @@ start_messenger(Prid, Receiver) ->
     		Receiver ! {kill},
     		connectTo(WoNl);
 		"/P\n" ->
+		%schlussendlich wird das nicht benötigt
 			ping(Prid, Receiver),
 			start_messenger(Prid, Receiver);
+		"/O\n" ->
+			printlines2(),
+			start_msg();
 		"/S\n" ->
 			Request = io:get_line("Searching User:"),
 			List = string:lexemes(Request, [$\n]),
 			ReqContact = lists:nth(1, List),
-			io:format("Gesuchter Kontakt: ~p:~p~n", [ReqContact, Receiver]),
-			deployrequest( ReqContact ,node(), Prid, Receiver),
+			deployrequest(ReqContact ,node(), Prid, Receiver),
 			start_messenger(Prid, Receiver);
 		"/H\n" ->
 			io:fwrite("/H for Help ~n"),
-			io:fwrite("/P See who is online~n"),
+			io:fwrite("/O See who is online~n"),
 			io:fwrite("/S Search for a Contact by Username ~n"),
-			io:fwrite("/C"),
-			io:fwrite("/B for Broadcasting to all Online Users"),
+			io:fwrite("/V Connect to user ~n"),
+			io:fwrite("/C See my Contactlist ~n"),
+			io:fwrite("/B for Broadcasting to all Online Users ~n"),
 			start_messenger(Prid, Receiver);
 		_ ->
 			{chat, Prid} ! {chat, node(), Term},
@@ -76,12 +86,12 @@ start_receiver(Prid, Messenger) ->
 		{cont, List} ->
 			start_receiver(Prid, Messenger);
 		{ping, Receiver} ->
-			io:format("Ping erhalten ~p~n", [Receiver]),
+			io:format(" ~p is Online~n", [lists:nth(1,string:tokens(atom_to_list(Receiver),"@"))]),
 			{chat, Receiver} ! {pong, Prid},
 			addOnCont(Receiver),
 			start_receiver(Prid, Messenger);
 		{pong, OnlineContact} ->
-    		io:fwrite("Pong erhalten: ~p ~n", [OnlineContact]),
+    		%io:fwrite("Pong erhalten: ~p ~n", [OnlineContact]),
 			addOnCont(OnlineContact),
 			start_receiver(Prid, Messenger);
 		{reqPID, SearchingPID, Word} ->
@@ -95,11 +105,13 @@ start_receiver(Prid, Messenger) ->
 			start_receiver(Prid, Messenger),
 			start_messenger(Prid, Messenger);
 		{imoff, Contact} ->
-			io:fwrite("Er ist Offline ~n"),
+			io:format(" ~p is Offline~n", [lists:nth(1,string:tokens(atom_to_list(Contact),"@"))]),
 			delCont(Contact),
 			start_receiver(Prid, Messenger);
 		{kill} ->
-			io:format("\ Receiver ended ~n")
+			file:delete("OnlineContact.txt"),
+			io:format("\ Receiver ended ~n"),
+			unregister(chat)
 
 	end.
 printlines() ->
@@ -126,6 +138,31 @@ printlines_helper(Device, Counter) ->
         
         eof        -> ok
     end.
+
+printlines2() ->
+    Counter = 1,
+    {ok, Device} = file:open("Contact.txt", [read]),
+    try printlines_helper2(Device, Counter)
+      after file:close(Device)
+    end.
+    
+
+printlines_helper2(Device, Counter) ->
+   case  file:read_line(Device) of 
+        {ok, Line} -> 
+        Contact = string:lexemes(Line, [$\n]),
+        %Falls die letzte Linie ein \n ist
+        if
+        	Contact =:= [] ->
+        		io:fwrite("\n");
+        	true ->
+        		Disp = lists:nth(1, Contact),
+        		io:fwrite("~p.)~p~n", [Counter, Disp]),
+        		printlines_helper(Device, Counter+1)
+        end;
+        
+        eof        -> ok
+    end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %Allen mitteilen dass ich offline bin
 offtoall(MYPID)->
@@ -134,6 +171,7 @@ offtoall(MYPID)->
       after file:close(Device)
     end.
 offtoall_helper(Device, MYPID)->
+	io:fwrite("BIN DAN MAL WEG"),
 	case  file:read_line(Device) of
         {ok, Line} -> 
         	NewList = string:lexemes(Line, [$\n]),
@@ -301,6 +339,7 @@ send_to_each_contact(Device, SearchingPID, Word, Prid, Messenger) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 delCont(Contact) ->
+	file:write_file("OnlineContact2.txt",<<>> ),
     {ok, Device} = file:open("OnlineContact.txt", [read]),
     try delCont_helper(Device, Contact)
       after file:close(Device)
