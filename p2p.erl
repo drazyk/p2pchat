@@ -43,7 +43,6 @@ start()->
       start connection to user from Onlinelist -> /V 'number of desired User'
       review commands -> /H
       search for a username -> /S
-      Broadcast messages to all OnlineContact -> /B
       quit -> /exit
 
 "),
@@ -68,6 +67,7 @@ start_rec() ->
       addOnCont(Receiver),
       start_rec();
     {pong, OnlineContact} ->
+        io:fwrite("Pong erhalten "),
       addOnCont(OnlineContact),
       start_rec();
     {reqPID, SearchingPID, Word} ->
@@ -89,7 +89,7 @@ start_rec() ->
   end.
 
 start_msg() ->
-  Term = io:get_line("Me:"),
+  Term = io:get_line("Ich:"),
   Test = delete_whitespaces(Term),
   case Test of
     "/exit\n" ->
@@ -116,19 +116,16 @@ start_msg() ->
         connectTo2(WoNl);
     "/H\n" ->
       io:fwrite("/H for Help ~n"),
-      io:fwrite("/O See who is online ~n"),
+      io:fwrite("/O See who is online~n"),
       io:fwrite("/S Search for a Contact by Username ~n"),
-      io:fwrite("/C Display Contaclist ~n"),
-      io:fwrite("/V Connect to a new user ~n"),
-      io:fwrite("/B for Broadcasting to all Online Users ~n"),
+      io:fwrite("/V Connect to user ~n"),
+      io:fwrite("/C See my Contactlist ~n"),
       start_msg();
     _ ->
       io:fwrite("Kein Gültiger Command ~nDrücken Sie /H für Hilfe~n"),
       start_msg()
   end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%erneuert das File, je nachdem wer offline geht
-% Contact = Der Kontakt der offline gegangen ist
 delCont(Contact) ->
   file:write_file("OnlineContact2.txt",<<>> ),
     {ok, Device} = file:open("OnlineContact.txt", [read]),
@@ -184,6 +181,8 @@ addOnCont_helper(Device, Contact) ->
                 addOnCont_helper(Device, Contact);
 
             true ->
+            %Muss schauen was hier stattdessen kommt
+            %Wahrscheinlich Ping nochmal neu starten
                 false            
         end;
 
@@ -227,7 +226,7 @@ offtoall_helper(Device, MYPID)->
         eof        -> ok
     end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%Zeige mir alle Kontake aus dem OnlineFile
+
 
 printlines2() ->
     Counter = 1,
@@ -241,6 +240,7 @@ printlines_helper2(Device, Counter) ->
    case  file:read_line(Device) of 
         {ok, Line} -> 
         Contact = string:lexemes(Line, [$\n]),
+        %Falls die letzte Linie ein \n ist
         if
           Contact =:= [] ->
             io:fwrite("\n");
@@ -254,8 +254,6 @@ printlines_helper2(Device, Counter) ->
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%Verbinde dich mit einem neuen Kontakt
-%Int = Platzierung des Users im File
 connectTo2(Int) ->
     Counter = 1,
     {ok, Device} = file:open("OnlineContact.txt", [read]),
@@ -284,24 +282,29 @@ connectTo_helper2(Device, Int, Counter) ->
         start_msg()
     end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%An jedem Kontakt den gesuchten User senden
 readlinesContact(Word, SearchingPID) ->
+  io:fwrite("ICH BIN IM CONTACT search drin, mit dem Wort: ~p:~p~n", [Word, SearchingPID]),
     {ok, Device} = file:open("Contact.txt", [read]),
     try search_all_contacts(Device, Word, SearchingPID)
       after file:close(Device)
     end.
+    
 
 search_all_contacts(Device, Word, SearchingPID) ->
    case  file:read_line(Device) of
         {ok, Line} -> 
+        io:fwrite("Ich habs in der SUCHE geschafft: ~s~n", [SearchingPID]),
         WTF = string:lexemes(Line, "@" ++ [$\n]),
+        io:fwrite("Meine Kontakte: ~p~n", [WTF]),
         Master = string:lexemes(Line, [$\n]),
         MasterPID = list_to_atom(lists:concat(Master)),
         Mem = lists:member(Word, WTF),
         if
           MasterPID =/= SearchingPID ->
+          io:fwrite("master ist anders ~n"),
             if
               Mem =:= true ->
+                    io:fwrite("BIN IM zweiten IF DRIN~n"),
                     ReqContact = string:lexemes(Line, [$\n]),
                     PID = list_to_atom(lists:concat(ReqContact)),
                     {chat, SearchingPID} ! {ackreq, PID};
@@ -313,12 +316,13 @@ search_all_contacts(Device, Word, SearchingPID) ->
             search_all_contacts(Device, Word, SearchingPID)
         end;
           
+          
+          %Sollte ins true hinein
+          
 
         eof        -> deployrequest(Word, SearchingPID)
     end.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%Anfrage senden nach suchendem Kontakt
-%Überprüft zudem dass es keinen Zyklus gibt, wieder an Master senden.
+
 deployrequest(Word, SearchingPID) ->
     {ok, Device} = file:open("Contact.txt", [read]),
     try send_to_each_contact(Device, SearchingPID, Word)
@@ -342,8 +346,7 @@ send_to_each_contact(Device, SearchingPID, Word) ->
 
         eof        -> ok
     end.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%Helperfunction
+
 delete_whitespaces(String) -> % does what it says, deletes all whitespaces in a string: "Hello how are you?" -> "Hellohowareyou?" 
   Result = lists:filter(fun(32) -> false; (_) -> true end,String),
   Result.
