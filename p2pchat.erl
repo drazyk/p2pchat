@@ -7,8 +7,8 @@
 		printlines2/0,
 		printlines_helper2/2,
 		get_each_contact/3,
-		connectTo/1,
-		connectTo_helper/3,
+		connectTo/3,
+		connectTo_helper/5,
 		addOnCont/1,
 		addOnCont_helper/2,
 		offtoall/1,
@@ -44,15 +44,16 @@ start_messenger(Prid, Receiver) ->
 		"/V\n"->
 			Request = io:get_line("Connect to User Nr.: "),
     		WoNl = string:lexemes(Request, [$\n]),
-    		Receiver ! {kill},
-    		connectTo(WoNl);
+    		unregister(chat),
+    		{chat, node()} ! {kill},
+    		connectTo(WoNl, Prid, Receiver);
 		"/P\n" ->
 		%schlussendlich wird das nicht benötigt
 			ping(Prid, Receiver),
 			start_messenger(Prid, Receiver);
 		"/O\n" ->
 			printlines2(),
-			start_msg();
+			start_messenger(Prid, Receiver);
 		"/S\n" ->
 			Request = io:get_line("Searching User:"),
 			List = string:lexemes(Request, [$\n]),
@@ -141,7 +142,7 @@ printlines_helper(Device, Counter) ->
 
 printlines2() ->
     Counter = 1,
-    {ok, Device} = file:open("Contact.txt", [read]),
+    {ok, Device} = file:open("OnlineContact.txt", [read]),
     try printlines_helper2(Device, Counter)
       after file:close(Device)
     end.
@@ -213,15 +214,15 @@ addOnCont_helper(Device, Contact) ->
     end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Für die Verbindung zu einem neuen Kontakt
-connectTo(Int) ->
+connectTo(Int, MasterPID, Receiver) ->
     Counter = 1,
-    {ok, Device} = file:open("Contact.txt", [read]),
-    try connectTo_helper(Device, Int, Counter)
+    {ok, Device} = file:open("OnlineContact.txt", [read]),
+    try connectTo_helper(Device, Int, Counter, MasterPID, Receiver)
       after file:close(Device)
     end.
     
 
-connectTo_helper(Device, Int, Counter) ->
+connectTo_helper(Device, Int, Counter, MasterPID, Receiver) ->
 	Convert = string:to_integer(Int),
     Integer = element(1, Convert),
    case  file:read_line(Device) of
@@ -233,10 +234,13 @@ connectTo_helper(Device, Int, Counter) ->
                 PID = list_to_atom(lists:concat(Contact)),
                 start_chat(PID);
             true ->
+            	connectTo_helper(Device, Int, Counter+1, MasterPID, Receiver),
                 false
-        end,
-        connectTo_helper(Device, Int, Counter+1);
-        eof        -> ok
+        end;
+        %connectTo_helper(Device, Int, Counter+1);
+        eof        -> 
+        io:fwrite("Kein Passender Kontakt gefunden ~n"),
+        start_messenger(MasterPID, Receiver)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
