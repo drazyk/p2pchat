@@ -241,7 +241,7 @@ printlines_helper2(Device, Counter) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 connectTo2(Int) ->
     Counter = 1,
-    {ok, Device} = file:open("Contact.txt", [read]),
+    {ok, Device} = file:open("OnlineContact.txt", [read]),
     try connectTo_helper2(Device, Int, Counter)
       after file:close(Device)
     end.
@@ -259,10 +259,12 @@ connectTo_helper2(Device, Int, Counter) ->
                 PID = list_to_atom(lists:concat(Contact)),
                 start_chat(PID);
             true ->
+                connectTo_helper2(Device, Int, Counter+1),
                 false
-        end,
-        connectTo_helper2(Device, Int, Counter+1);
-        eof        -> ok
+        end;
+        eof        -> 
+        io:fwrite("Kein Passender Kontakt gefunden ~n"),
+        start_msg()
     end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
