@@ -98,13 +98,11 @@ start_receiver(Prid, Messenger) ->
 		{reqPID, SearchingPID, Word} ->
 			io:format("Anfrage erhalten: ~p--~p~n ", [Word, SearchingPID]),
 			readlinesContact(Word, SearchingPID, Prid, Messenger),
-			start_receiver(Prid, Messenger),
-			start_messenger(Prid, Messenger);
+			start_receiver(Prid, Messenger);
 		{ackreq, PID} ->
 			io:format("Antwort erhalten: ~p~n", [PID]),
 			file:write_file("Contact.txt", io_lib:fwrite("~s~n", [PID]), [append]),
-			start_receiver(Prid, Messenger),
-			start_messenger(Prid, Messenger);
+			start_receiver(Prid, Messenger);
 		{imoff, Contact} ->
 			io:format(" ~p is Offline~n", [lists:nth(1,string:tokens(atom_to_list(Contact),"@"))]),
 			delCont(Contact),
@@ -303,21 +301,26 @@ search_all_contacts(Device, Word, SearchingPID, Prid, Messenger) ->
         io:fwrite("Ich habs in der SUCHE geschafft: ~s~n", [SearchingPID]),
         WTF = string:lexemes(Line, "@" ++ [$\n]),
         io:fwrite("Meine Kontakte: ~p~n", [WTF]),
+        Master = string:lexemes(Line, [$\n]),
+        MasterPID = list_to_atom(lists:concat(Master)),
         Mem = lists:member(Word, WTF),
-        	if
-        		Mem =:= true ->
-					io:fwrite("BIN IM IF DRIN~n"),
+        if
+          MasterPID =/= SearchingPID ->
+          io:fwrite("master ist anders ~n"),
+            if
+              Mem =:= true ->
+                    io:fwrite("BIN IM zweiten IF DRIN~n"),
                     ReqContact = string:lexemes(Line, [$\n]),
                     PID = list_to_atom(lists:concat(ReqContact)),
                     {chat, SearchingPID} ! {ackreq, PID};
-        		true -> 
-        			false
-        	end,
-        	deployrequest(Word, SearchingPID, Prid, Messenger),
-        	search_all_contacts(Device, Word, SearchingPID, Prid, Messenger);
-
-        eof        -> start_receiver(Prid, Messenger), 
-        			start_messenger(Prid, Messenger)
+              true ->
+                    search_all_contacts(Device, Word, SearchingPID, Prid, Messenger) 
+                    
+            end;
+          true ->
+            search_all_contacts(Device, Word, SearchingPID, Prid, Messenger)
+        end;
+        eof        -> ok
     end.
 
 
@@ -333,12 +336,16 @@ send_to_each_contact(Device, SearchingPID, Word, Prid, Messenger) ->
         {ok, Line} -> 
             NewList = string:lexemes(Line, [$\n]),
             PID = list_to_atom(lists:concat(NewList)),
-            io:format("Senden an Kontakt: ~p~n", [PID]),
-            {chat, PID} ! {reqPID, SearchingPID, Word},
-            send_to_each_contact(Device, SearchingPID, Word, Prid,Messenger);
-
-        eof        -> start_messenger(Prid, Messenger),
-        				start_receiver(Prid, Messenger)
+            if
+              PID =/= SearchingPID ->
+                io:format("Senden an Kontakt: ~p~n", [PID]),
+                {chat, PID} ! {reqPID, SearchingPID, Word};
+              true ->
+              send_to_each_contact(Device, SearchingPID, Word, Prid, Messenger)
+            end,
+            
+            send_to_each_contact(Device, SearchingPID, Word, Prid, Messenger);
+        eof        -> ok
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
