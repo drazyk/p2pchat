@@ -37,7 +37,7 @@ start_messenger(Prid, Receiver) ->
 		"/exit\n" -> 
 		offtoall(Prid),
 		unregister(chat),
-		self() ! {kill};
+		Receiver ! {kill};
 		"/C\n" -> 
 			printlines(),
 			start_messenger(Prid, Receiver);
@@ -48,7 +48,6 @@ start_messenger(Prid, Receiver) ->
     		{chat, node()} ! {kill},
     		connectTo(WoNl, Prid, Receiver);
 		"/P\n" ->
-		%schlussendlich wird das nicht benötigt
 			ping(Prid, Receiver),
 			start_messenger(Prid, Receiver);
 		"/O\n" ->
@@ -66,6 +65,7 @@ start_messenger(Prid, Receiver) ->
 			io:fwrite("/S Search for a Contact by Username ~n"),
 			io:fwrite("/V Connect to user ~n"),
 			io:fwrite("/C See my Contactlist ~n"),
+			io:fwrite("/B for Broadcasting to all Online Users ~n"),
 			start_messenger(Prid, Receiver);
 		_ ->
 			{chat, Prid} ! {chat, node(), Term},
@@ -91,7 +91,6 @@ start_receiver(Prid, Messenger) ->
 			addOnCont(Receiver),
 			start_receiver(Prid, Messenger);
 		{pong, OnlineContact} ->
-    		%io:fwrite("Pong erhalten: ~p ~n", [OnlineContact]),
 			addOnCont(OnlineContact),
 			start_receiver(Prid, Messenger);
 		{reqPID, SearchingPID, Word} ->
@@ -112,6 +111,8 @@ start_receiver(Prid, Messenger) ->
 			unregister(chat)
 
 	end.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Zeige mir mein Adressbuch
 printlines() ->
     Counter = 1,
     {ok, Device} = file:open("Contact.txt", [read]),
@@ -124,7 +125,6 @@ printlines_helper(Device, Counter) ->
    case  file:read_line(Device) of 
         {ok, Line} -> 
         Contact = string:lexemes(Line, [$\n]),
-        %Falls die letzte Linie ein \n ist
         if
         	Contact =:= [] ->
         		io:fwrite("\n");
@@ -136,7 +136,8 @@ printlines_helper(Device, Counter) ->
         
         eof        -> ok
     end.
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Zeige mir alle Kontakte die Online sind
 printlines2() ->
     Counter = 1,
     {ok, Device} = file:open("OnlineContact.txt", [read]),
@@ -169,6 +170,7 @@ offtoall(MYPID)->
       after file:close(Device)
     end.
 offtoall_helper(Device, MYPID)->
+	io:fwrite("BIN DAN MAL WEG"),
 	case  file:read_line(Device) of
         {ok, Line} -> 
         	NewList = string:lexemes(Line, [$\n]),
@@ -200,8 +202,6 @@ addOnCont_helper(Device, Contact) ->
                 addOnCont_helper(Device, Contact);
 
             true ->
-            %Muss schauen was hier stattdessen kommt
-            %Wahrscheinlich Ping nochmal neu starten
                 false            
         end;
 
@@ -233,15 +233,13 @@ connectTo_helper(Device, Int, Counter, MasterPID, Receiver) ->
             	connectTo_helper(Device, Int, Counter+1, MasterPID, Receiver),
                 false
         end;
-        %connectTo_helper(Device, Int, Counter+1);
         eof        -> 
         io:fwrite("Kein Passender Kontakt gefunden ~n"),
         start_messenger(MasterPID, Receiver)
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%Hab den zweck dieser Funktion vergessen, vielleicht fällt es mir noch ein
+%Zum Pingen, jedoch nicht mehr verwendet
 readlines(MasterPID, Receiver) ->
     {ok, Device} = file:open("Contact.txt", [read]),
     try get_each_contact(Device, MasterPID, Receiver)
@@ -285,7 +283,6 @@ get_each_contactPing(Device, User2, Receiver) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 readlinesContact(Word, SearchingPID, Prid, Messenger) ->
-	io:fwrite("ICH BIN IM CONTACT search drin, mit dem Wort: ~p:~p~n", [Word, SearchingPID]),
     {ok, Device} = file:open("Contact.txt", [read]),
     io:fwrite("DEVICE: ~p", [Device]),
     try search_all_contacts(Device, Word, SearchingPID, Prid, Messenger)
@@ -296,9 +293,7 @@ readlinesContact(Word, SearchingPID, Prid, Messenger) ->
 search_all_contacts(Device, Word, SearchingPID, Prid, Messenger) ->
    case  file:read_line(Device) of
         {ok, Line} -> 
-        io:fwrite("Ich habs in der SUCHE geschafft: ~s~n", [SearchingPID]),
         WTF = string:lexemes(Line, "@" ++ [$\n]),
-        io:fwrite("Meine Kontakte: ~p~n", [WTF]),
         Master = string:lexemes(Line, [$\n]),
         MasterPID = list_to_atom(lists:concat(Master)),
         Mem = lists:member(Word, WTF),
@@ -307,7 +302,6 @@ search_all_contacts(Device, Word, SearchingPID, Prid, Messenger) ->
           io:fwrite("master ist anders ~n"),
             if
               Mem =:= true ->
-                    io:fwrite("BIN IM zweiten IF DRIN~n"),
                     ReqContact = string:lexemes(Line, [$\n]),
                     PID = list_to_atom(lists:concat(ReqContact)),
                     {chat, SearchingPID} ! {ackreq, PID};
@@ -320,7 +314,7 @@ search_all_contacts(Device, Word, SearchingPID, Prid, Messenger) ->
         end;
         eof        -> ok
     end.
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 deployrequest(Word, SearchingPID, Prid, Messenger) ->
@@ -336,7 +330,6 @@ send_to_each_contact(Device, SearchingPID, Word, Prid, Messenger) ->
             PID = list_to_atom(lists:concat(NewList)),
             if
               PID =/= SearchingPID ->
-                io:format("Senden an Kontakt: ~p~n", [PID]),
                 {chat, PID} ! {reqPID, SearchingPID, Word};
               true ->
               send_to_each_contact(Device, SearchingPID, Word, Prid, Messenger)
@@ -347,6 +340,9 @@ send_to_each_contact(Device, SearchingPID, Word, Prid, Messenger) ->
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%Aktualisiert den OnlineContact, wenn jemand offline geht
+% ein zweites File wird erstellt, alle KOntakte ausser Contact
+% werden kopiert und das erste File wird gelöscht
 delCont(Contact) ->
 	file:write_file("OnlineContact2.txt",<<>> ),
     {ok, Device} = file:open("OnlineContact.txt", [read]),
@@ -368,8 +364,6 @@ delCont_helper(Device, Contact) ->
                 delCont_helper(Device, Contact);
 
             true ->
-            %Muss schauen was hier stattdessen kommt
-            %Wahrscheinlich Ping nochmal neu starten
                 delCont_helper(Device, Contact)            
         end;
 
@@ -378,10 +372,11 @@ delCont_helper(Device, Contact) ->
 removefile() ->
 	file:delete("OnlineContact.txt"),
 	rename().
-
+%das zweite File wird umbenannt
 rename() ->
 	file:rename("OnlineContact2.txt", "OnlineContact.txt").
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	
 delete_whitespaces(String) -> % does what it says, deletes all whitespaces in a string: "Hello how are you?" -> "Hellohowareyou?" 
 	Result = lists:filter(fun(32) -> false; (_) -> true end,String),
