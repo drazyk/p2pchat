@@ -29,3 +29,14 @@ Wie führt man die Implementierung des Chat's (1) aus:
      
      
 9) Im Erlang-Shell: p2p:start().
+
+
+Broadcasting:
+Um das Broadcasting auszuführen und die Evaluation nachzumachen, muss man zunächst einmal die brp2pchat Datei
+mit c(brp2pchat) kompilieren und mit brp2pchat:start_chat() starten.
+Mit dem Befehl '/broadcast' wird nun ein Netzwerk mit der Anzahl der Knoten die in der init() Funktion durch
+die Variable Count definiert ist erschaffen und der Prozess wird in der Konsole ausgegeben. Alle
+Nachrichten die man nun in den Chat schreibt und mit der Entertaste abschickt werden an den gesamten 
+Tokenring geschickt. Wenn alle Knoten lokal erschaffen sind, kann man jede Nachricht in der Konsole 
+nachvollziehen. Mit dem Befehl '/brkill' kann man zufällig 10 Knoten aus dem Tokenring terminieren und dann
+ein neuen Tokenring ohne diese Knoten erstellen. Der Befehl '/exit' beendet das Programm.
