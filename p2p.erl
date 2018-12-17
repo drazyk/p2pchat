@@ -43,7 +43,6 @@ start()->
       start connection to user from Onlinelist -> /V 'number of desired User'
       review commands -> /H
       search for a username -> /S
-      Broadcast messages to all OnlineContact -> /B
       quit -> /exit
 
 "),
